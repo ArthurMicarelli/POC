@@ -1,36 +1,41 @@
-name: Tests
-
-#############################
-# Start the job on all push #
-#############################
-on: [push, pull_request]
+name: PipelineFlask
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
 
 jobs:
-  tests:
-    name: Python ${{ matrix.python-version }} Flask ${{ matrix.flask-version }}
-    runs-on: ubuntu-20.04
-    environment: test
-
-    strategy:
-      matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11"]
-        flask-version: ["2.3.2", "3.0.0"]
+  build:
+    runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v3
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.10"
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install pipenv
-          python --version; pip --version; pipenv --version
-          pipenv run pip install flask==${{ matrix.flask-version }}
-      - name: Run tests
+          python -m pip install --upgrade pip
+          pip install flake8 pytest
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Teste
+        run: coverage run app_test.py
+
+      - name: Relatorio do teste
+        run: coverage report -m
+
+      - name: Render Deploy Action
+        uses: johnbeynon/render-deploy-action@v0.0.8
+        with:
+          service-id: srv-crr8jkbv2p9s73cl0l40
+          api-key: rnd_CawuSTcR5Tv5NNPc7PYGW85IbFNL
+
+      - name: Deploy no EC2 -AWS
         run: |
-          make check
-          make test
-        env:
-          RANDOM_SEED: 0
+          echo "Conectando no EC2"
+          echo "${{secrets.AWS_CHAVE_PIPELINE_AWS_PEM}}" > private_key && chmod 600 private_key
+          ssh -o StrictHostKeyChecking=no -i private_key ubuntu@ec2-54-197-35-208.compute-1.amazonaws.com "
+          cd Aws_pipeline/;git pull;cd python_flask/;./executar.sh"
